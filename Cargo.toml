@@ -2,10 +2,10 @@
 name = "async-trait-nostd"
 version = "0.1.89"
 categories = ["asynchronous", "no-std"]
-description = "Type erasure for async trait methods"
+description = "Async-trait with no_std support"
 edition = "2021"
 exclude = ["build.rs"]
-keywords = ["async"]
+keywords = ["async", "no_std"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/async-trait"
 rust-version = "1.71"
