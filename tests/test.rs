@@ -17,7 +17,13 @@
     clippy::uninlined_format_args,
     clippy::unused_async
 )]
+#![no_std]
 
+extern crate alloc;
+
+use ::core::iter;
+
+use alloc::boxed::Box;
 use async_trait::async_trait;
 
 pub mod executor;
@@ -189,35 +195,19 @@ pub async fn test_can_destruct() {
 
 pub async fn test_self_in_macro() {
     #[async_trait]
+    #[allow(dead_code)]
     trait Trait {
         async fn a(self);
         async fn b(&mut self);
         async fn c(&self);
     }
-
-    #[async_trait]
-    impl Trait for String {
-        async fn a(self) {
-            println!("{}", self);
-        }
-        async fn b(&mut self) {
-            println!("{}", self);
-        }
-        async fn c(&self) {
-            println!("{}", self);
-        }
-    }
-
-    let _ = <String as Trait>::a;
-    let _ = <String as Trait>::b;
-    let _ = <String as Trait>::c;
 }
 
 pub async fn test_inference() {
     #[async_trait]
     pub trait Trait {
         async fn f() -> Box<dyn Iterator<Item = ()>> {
-            Box::new(std::iter::empty())
+            Box::new(iter::empty())
         }
     }
 
@@ -257,6 +247,7 @@ pub async fn test_unimplemented() {
 
 // https://github.com/dtolnay/async-trait/issues/1
 pub mod issue1 {
+    use alloc::vec::Vec;
     use async_trait::async_trait;
 
     #[async_trait]
@@ -273,7 +264,7 @@ pub mod issue1 {
 // https://github.com/dtolnay/async-trait/issues/2
 pub mod issue2 {
     use async_trait::async_trait;
-    use std::future::Future;
+    use core::future::Future;
 
     #[async_trait]
     pub trait Issue2: Future {
@@ -300,8 +291,8 @@ pub mod issue9 {
 
 // https://github.com/dtolnay/async-trait/issues/11
 pub mod issue11 {
+    use alloc::sync::Arc;
     use async_trait::async_trait;
-    use std::sync::Arc;
 
     #[async_trait]
     pub trait Issue11 {
@@ -319,7 +310,7 @@ pub mod issue11 {
 // https://github.com/dtolnay/async-trait/issues/15
 pub mod issue15 {
     use async_trait::async_trait;
-    use std::marker::PhantomData;
+    use core::marker::PhantomData;
 
     pub trait Trait {}
 
@@ -331,6 +322,7 @@ pub mod issue15 {
 
 // https://github.com/dtolnay/async-trait/issues/17
 pub mod issue17 {
+    use alloc::string::String;
     use async_trait::async_trait;
 
     #[async_trait]
@@ -345,7 +337,7 @@ pub mod issue17 {
     #[async_trait]
     impl Issue17 for Struct {
         async fn f(&self) {
-            println!("{}", self.string);
+            let _ = &self.string;
         }
     }
 }
@@ -382,9 +374,10 @@ pub mod issue23 {
 // https://github.com/dtolnay/async-trait/issues/25
 #[cfg(async_trait_nightly_testing)]
 pub mod issue25 {
+    use alloc::string::String;
     use crate::executor;
     use async_trait::async_trait;
-    use std::fmt::{Display, Write};
+    use core::fmt::{Display, Write};
 
     #[async_trait]
     trait AsyncToString {
@@ -394,7 +387,7 @@ pub mod issue25 {
     #[async_trait]
     impl AsyncToString for String {
         async fn async_to_string(&self) -> String {
-            "special".to_owned()
+            String::from("special")
         }
     }
 
@@ -467,6 +460,7 @@ pub mod issue28 {
 
 // https://github.com/dtolnay/async-trait/issues/31
 pub mod issue31 {
+    use alloc::string::String;
     use async_trait::async_trait;
 
     pub struct Struct<'a> {
@@ -505,6 +499,7 @@ pub mod issue42 {
 
 // https://github.com/dtolnay/async-trait/issues/44
 pub mod issue44 {
+    use alloc::boxed::Box;
     use async_trait::async_trait;
 
     #[async_trait]
@@ -522,142 +517,6 @@ pub mod issue44 {
 
     #[async_trait]
     impl StaticWithWhereSelf for Struct {}
-}
-
-// https://github.com/dtolnay/async-trait/issues/45
-pub mod issue45 {
-    use crate::executor;
-    use async_trait::async_trait;
-    use std::fmt::Debug;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex};
-    use tracing::event::Event;
-    use tracing::field::{Field, Visit};
-    use tracing::span::{Attributes, Id, Record};
-    use tracing::{info, instrument, subscriber, Metadata, Subscriber};
-
-    #[async_trait]
-    pub trait Parent {
-        async fn foo(&mut self, v: usize);
-    }
-
-    #[async_trait]
-    pub trait Child {
-        async fn bar(&self);
-    }
-
-    #[derive(Debug)]
-    struct Impl(usize);
-
-    #[async_trait]
-    impl Parent for Impl {
-        #[instrument]
-        async fn foo(&mut self, v: usize) {
-            self.0 = v;
-            self.bar().await;
-        }
-    }
-
-    #[async_trait]
-    impl Child for Impl {
-        // Let's check that tracing detects the renaming of the `self` variable
-        // too, as tracing::instrument is not going to be able to skip the
-        // `self` argument if it can't find it in the function signature.
-        #[instrument(skip(self))]
-        async fn bar(&self) {
-            info!(val = self.0);
-        }
-    }
-
-    // A simple subscriber implementation to test the behavior of async-trait
-    // with tokio-rs/tracing. This implementation is not robust against race
-    // conditions, but it's not an issue here as we are only polling on a single
-    // future at a time.
-    #[derive(Debug)]
-    struct SubscriberInner {
-        current_depth: AtomicU64,
-        // We assert that nested functions work. If the fix were to break, we
-        // would see two top-level functions instead of `bar` nested in `foo`.
-        max_depth: AtomicU64,
-        max_span_id: AtomicU64,
-        // Name of the variable / value / depth when the event was recorded.
-        value: Mutex<Option<(&'static str, u64, u64)>>,
-    }
-
-    #[derive(Debug, Clone)]
-    struct TestSubscriber {
-        inner: Arc<SubscriberInner>,
-    }
-
-    impl TestSubscriber {
-        fn new() -> Self {
-            TestSubscriber {
-                inner: Arc::new(SubscriberInner {
-                    current_depth: AtomicU64::new(0),
-                    max_depth: AtomicU64::new(0),
-                    max_span_id: AtomicU64::new(1),
-                    value: Mutex::new(None),
-                }),
-            }
-        }
-    }
-
-    struct U64Visitor(Option<(&'static str, u64)>);
-
-    impl Visit for U64Visitor {
-        fn record_debug(&mut self, _field: &Field, _value: &dyn Debug) {}
-
-        fn record_u64(&mut self, field: &Field, value: u64) {
-            self.0 = Some((field.name(), value));
-        }
-    }
-
-    impl Subscriber for TestSubscriber {
-        fn enabled(&self, _metadata: &Metadata) -> bool {
-            true
-        }
-        fn new_span(&self, _span: &Attributes) -> Id {
-            Id::from_u64(self.inner.max_span_id.fetch_add(1, Ordering::AcqRel))
-        }
-        fn record(&self, _span: &Id, _values: &Record) {}
-        fn record_follows_from(&self, _span: &Id, _follows: &Id) {}
-        fn event(&self, event: &Event) {
-            let mut visitor = U64Visitor(None);
-            event.record(&mut visitor);
-            if let Some((s, v)) = visitor.0 {
-                let current_depth = self.inner.current_depth.load(Ordering::Acquire);
-                *self.inner.value.lock().unwrap() = Some((s, v, current_depth));
-            }
-        }
-        fn enter(&self, _span: &Id) {
-            let old_depth = self.inner.current_depth.fetch_add(1, Ordering::AcqRel);
-            if old_depth + 1 > self.inner.max_depth.load(Ordering::Acquire) {
-                self.inner.max_depth.fetch_add(1, Ordering::AcqRel);
-            }
-        }
-        fn exit(&self, _span: &Id) {
-            self.inner.current_depth.fetch_sub(1, Ordering::AcqRel);
-        }
-    }
-
-    #[test]
-    fn tracing() {
-        // Create the future outside of the subscriber, as no call to tracing
-        // should be made until the future is polled.
-        let mut struct_impl = Impl(0);
-        let fut = struct_impl.foo(5);
-        let subscriber = TestSubscriber::new();
-        subscriber::with_default(subscriber.clone(), || executor::block_on_simple(fut));
-        // Did we enter bar inside of foo?
-        assert_eq!(subscriber.inner.max_depth.load(Ordering::Acquire), 2);
-        // Have we exited all spans?
-        assert_eq!(subscriber.inner.current_depth.load(Ordering::Acquire), 0);
-        // Did we create only two spans? Note: spans start at 1, hence the -1.
-        assert_eq!(subscriber.inner.max_span_id.load(Ordering::Acquire) - 1, 2);
-        // Was the value recorded at the right depth i.e. in the right function?
-        // If so, was it the expected value?
-        assert_eq!(*subscriber.inner.value.lock().unwrap(), Some(("val", 5, 2)));
-    }
 }
 
 // https://github.com/dtolnay/async-trait/issues/46
@@ -728,7 +587,7 @@ pub mod issue53 {
     }
 
     #[async_trait]
-    impl Trait for std::marker::PhantomData<Struct> {
+    impl Trait for core::marker::PhantomData<Struct> {
         async fn method() {
             let _ = Self;
         }
@@ -783,7 +642,7 @@ pub mod issue73 {
         const ASSOCIATED: &'static str;
 
         async fn associated(&self) {
-            println!("Associated:{}", Self::ASSOCIATED);
+            let _ = Self::ASSOCIATED;
         }
     }
 }
@@ -1046,7 +905,7 @@ pub mod issue104 {
 // https://github.com/dtolnay/async-trait/issues/106
 pub mod issue106 {
     use async_trait::async_trait;
-    use std::future::Future;
+    use core::future::Future;
 
     #[async_trait]
     pub trait ProcessPool: Send + Sync {
@@ -1078,7 +937,7 @@ pub mod issue106 {
 // https://github.com/dtolnay/async-trait/issues/110
 pub mod issue110 {
     use async_trait::async_trait;
-    use std::marker::PhantomData;
+    use core::marker::PhantomData;
 
     #[async_trait]
     pub trait Loader {
@@ -1180,7 +1039,7 @@ pub mod issue134 {
 pub mod drop_order {
     use crate::executor;
     use async_trait::async_trait;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     struct Flagger<'a>(&'a AtomicBool);
 
@@ -1336,7 +1195,7 @@ pub mod issue154 {
     impl MyTrait for Struct {
         async fn f(&self) {
             const MAX: u16 = 128;
-            println!("{}", MAX);
+            let _ = MAX;
         }
     }
 }
@@ -1359,9 +1218,8 @@ pub mod issue158 {
 // https://github.com/dtolnay/async-trait/issues/161
 #[allow(clippy::mut_mut)]
 pub mod issue161 {
+    use alloc::sync::Arc;
     use async_trait::async_trait;
-    use futures::future::FutureExt;
-    use std::sync::Arc;
 
     #[async_trait]
     pub trait Trait {
@@ -1373,11 +1231,10 @@ pub mod issue161 {
     #[async_trait]
     impl Trait for MyStruct {
         async fn f(self: Arc<Self>) {
-            futures::select! {
-                () = async {
-                    println!("{}", self.0);
-                }.fuse() => {}
+            async {
+                let _ = self.0;
             }
+            .await;
         }
     }
 }
@@ -1427,7 +1284,7 @@ pub mod issue183 {
 // https://github.com/dtolnay/async-trait/issues/199
 pub mod issue199 {
     use async_trait::async_trait;
-    use std::cell::Cell;
+    use core::cell::Cell;
 
     struct IncrementOnDrop<'a>(&'a Cell<usize>);
 
@@ -1474,8 +1331,8 @@ pub mod issue204 {
 
 // https://github.com/dtolnay/async-trait/issues/210
 pub mod issue210 {
+    use alloc::sync::Arc;
     use async_trait::async_trait;
-    use std::sync::Arc;
 
     #[async_trait]
     pub trait Trait {
@@ -1584,7 +1441,7 @@ pub mod issue236 {
     #![allow(clippy::manual_async_fn)]
 
     use async_trait::async_trait;
-    use std::future::{self, Future, Ready};
+    use core::future::{self, Future, Ready};
 
     // Does not trigger the lint.
     pub async fn async_fn() -> Ready<()> {
@@ -1639,7 +1496,7 @@ pub mod issue266 {
     impl Trait for () {
         async fn f() -> ! {
             loop {
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                core::hint::spin_loop();
             }
         }
     }

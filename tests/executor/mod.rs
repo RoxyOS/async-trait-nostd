@@ -1,7 +1,7 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::ptr;
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use core::future::Future;
+use core::pin::Pin;
+use core::ptr;
+use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 // Executor for a future that resolves immediately (test only).
 #[allow(clippy::missing_panics_doc)]
