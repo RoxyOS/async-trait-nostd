@@ -1,4 +1,4 @@
-//! [![github]](https://github.com/dtolnay/async-trait)&ensp;[![crates-io]](https://crates.io/crates/async-trait)&ensp;[![docs-rs]](https://docs.rs/async-trait)
+//! [![github]](https://github.com/dtolnay/async-trait)&ensp;[![crates-io]](https://crates.io/crates/async-trait-nostd)&ensp;[![docs-rs]](https://docs.rs/async-trait-nostd)
 //!
 //! [github]: https://img.shields.io/badge/github-8da0cb?style=for-the-badge&labelColor=555555&logo=github
 //! [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
@@ -62,6 +62,7 @@
 //! for example.
 //!
 //! ```
+//! # extern crate alloc;
 //! use async_trait::async_trait;
 //!
 //! #[async_trait]
@@ -198,6 +199,7 @@
 //! The fix is to name the lifetime or use `'_`.
 //!
 //! ```
+//! # extern crate alloc;
 //! # use async_trait::async_trait;
 //! #
 //! # type Elided<'a> = &'a usize;
@@ -214,7 +216,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/async-trait/0.1.89")]
+#![doc(html_root_url = "https://docs.rs/async-trait-nostd/0.1.89")]
 #![allow(
     clippy::default_trait_access,
     clippy::doc_markdown,

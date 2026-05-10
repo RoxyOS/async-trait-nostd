@@ -1,10 +1,8 @@
 [package]
-name = "async-trait"
+name = "async-trait-nostd"
 version = "0.1.89"
-authors = ["David Tolnay <dtolnay@gmail.com>"]
 categories = ["asynchronous", "no-std"]
 description = "Type erasure for async trait methods"
-documentation = "https://docs.rs/async-trait"
 edition = "2021"
 exclude = ["build.rs"]
 keywords = ["async"]
@@ -13,6 +11,7 @@ repository = "https://github.com/dtolnay/async-trait"
 rust-version = "1.71"
 
 [lib]
+name = "async_trait"
 proc-macro = true
 
 [dependencies]
