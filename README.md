@@ -1,10 +1,10 @@
 # async-trait-nostd
 
-`[async-trait](https://crates.io/crates/async-trait)` with `no_std` support.
+[`async-trait`](https://crates.io/crates/async-trait) with `no_std` support.
 
 ## `Std` usage
 
-`async-trait-nostd` doesnt work under `std` environment, use the original `[async-trait](https://crates.io/crates/async-trait)` instead.
+`async-trait-nostd` doesnt work under `std` environment, use the original [`async-trait`](https://crates.io/crates/async-trait) instead.
 
 ---
 
