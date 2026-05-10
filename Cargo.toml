@@ -1,6 +1,6 @@
 [package]
 name = "async-trait-nostd"
-version = "0.1.89"
+version = "0.1.90"
 categories = ["asynchronous", "no-std"]
 description = "Async-trait with no_std support"
 edition = "2021"
